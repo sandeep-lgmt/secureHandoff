@@ -18,7 +18,8 @@ import java.time.Instant;
 @Builder
 
 public class ReleaseRequest {
-     @Id
+
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -49,6 +50,5 @@ public class ReleaseRequest {
         QUORUM_MET,
         EXPIRED
     }
-
 
 }
