@@ -19,18 +19,15 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
 @Entity
-@Table(name = "release_requests")
+@Table(name = "trustee_links")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
-public class ReleaseRequest {
-
-    @Id
+public class TrusteeLink {
+     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -38,28 +35,37 @@ public class ReleaseRequest {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
+    // Nullable until the invited person registers/accepts and is linked to a real User
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "trustee_user_id")
+    private User trusteeUser;
+
     @Column(nullable = false)
-    private int requiredConfirmations; // e.g. 2, computed as min(2, totalAcceptedTrustees) at creation time
+    private String trusteeEmail;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private Status status = Status.PENDING;
+    private TrusteeStatus status = TrusteeStatus.PENDING;
+
+    @Column(nullable = false, unique = true)
+    private String inviteToken;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    private Instant quorumMetAt;
+    private Instant respondedAt;
 
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
     }
 
-    public enum Status {
+    public enum TrusteeStatus {
         PENDING,
-        QUORUM_MET,
-        EXPIRED
+        ACCEPTED,
+        DECLINED,
+        REVOKED
     }
 
 }
