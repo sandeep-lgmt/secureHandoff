@@ -6,14 +6,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.common.errors.ApiException;
 import org.springframework.http.HttpStatus;
-import com.securehandoff.exception.ApiException;
-import org.springframework.http.HttpStatus;
+import com.securehandoff.securehandoff.exception.ApiException;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 @Component
 public class LoginRateLimiter {
      private static final int MAX_ATTEMPTS = 5;

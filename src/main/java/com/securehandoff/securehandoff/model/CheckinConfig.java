@@ -27,7 +27,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 
-   class CheckInConfig {
+  public class CheckInConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

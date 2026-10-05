@@ -1,15 +1,17 @@
 package com.securehandoff.securehandoff.Security;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.function.Function;
 
 import javax.crypto.SecretKey;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import io.lettuce.core.dynamic.annotation.Value;
 
 public class JwtUtil {
      private final SecretKey signingKey;

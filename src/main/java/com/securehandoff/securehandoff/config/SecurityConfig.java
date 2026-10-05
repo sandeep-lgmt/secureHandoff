@@ -1,5 +1,6 @@
 package com.securehandoff.securehandoff.config;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -16,18 +17,23 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.securehandoff.securehandoff.Security.AppUserDetailsService;
+import com.securehandoff.securehandoff.Security.JwtAuth;
 
 import lombok.RequiredArgsConstructor;
+
+
+
+ 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
       private final AppUserDetailsService userDetailsService;
-    private final JwtAuthFilter jwtAuthFilter;
+      private final JwtAuth jwtAuth;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // BCrypt — matches the hashing approach already used in your GharPdharo/Journal API work.
+        
         return new BCryptPasswordEncoder();
     }
 
@@ -58,7 +64,7 @@ public class SecurityConfig {
             )
             .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuth, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

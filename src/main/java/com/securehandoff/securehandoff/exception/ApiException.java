@@ -2,7 +2,7 @@ package com.securehandoff.securehandoff.exception;
 
 import org.springframework.http.HttpStatus;
 
-public class ApiException {
+public class ApiException extends RuntimeException{
         private final HttpStatus status;
 
     public ApiException(String message, HttpStatus status) {
