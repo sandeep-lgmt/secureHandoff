@@ -29,7 +29,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 
-public class AcessPacket {
+public class AccessPacket {
  @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

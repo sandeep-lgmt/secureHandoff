@@ -54,6 +54,8 @@ public class TrusteeLink {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    private Instant inviteExpiresAt;
+
     private Instant respondedAt;
 
     @PrePersist

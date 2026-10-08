@@ -1,0 +1,11 @@
+# LOCAL DEVELOPMENT ONLY - throwaway values. Never use these in a real environment.
+# Activate with:  SPRING_PROFILES_ACTIVE=dev
+spring:
+  datasource:
+    username: root
+    password: root
+app:
+  jwt:
+    secret: dev-only-jwt-secret-change-me-0123456789abcdef
+  encryption:
+    packet-secret: YjPszyPmJRcOs6ErwfoZ8Yg1/7uAvw+bXY1GRYioLBw=

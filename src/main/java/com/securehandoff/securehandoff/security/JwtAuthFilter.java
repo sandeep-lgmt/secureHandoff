@@ -1,15 +1,14 @@
-package com.securehandoff.securehandoff.Security;
+package com.securehandoff.securehandoff.security;
 
- import org.springframework.lang.NonNull;
+import java.io.IOException;
+
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import com.securehandoff.securehandoff.service.AppUserDetailsService;
-import com.securehandoff.securehandoff.Security.JwtUtil;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuth  extends OncePerRequestFilter{
+public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final AppUserDetailsService userDetailsService;
@@ -55,11 +54,10 @@ public class JwtAuth  extends OncePerRequestFilter{
             }
         } catch (Exception ex) {
             // Invalid/expired token: leave the security context empty.
-            // Spring Security will reject the request downstream if the endpoint requires auth.
+            // Spring Security rejects the request downstream if the endpoint requires auth.
             SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
     }
-
 }

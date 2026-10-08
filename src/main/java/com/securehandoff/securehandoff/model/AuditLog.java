@@ -10,7 +10,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,6 +40,8 @@ public class AuditLog {
     @Column(nullable = false, length = 1000)
     private String description;
 
+    // Set explicitly by AuditService (truncated to micros) BEFORE hashing, so the stored
+    // value always equals the hashed value. No @PrePersist here on purpose.
     @Column(nullable = false, updatable = false)
     private Instant occurredAt;
 
@@ -49,10 +50,4 @@ public class AuditLog {
 
     @Column(nullable = false, length = 64)
     private String hash;
-
-    @PrePersist
-    void onCreate() {
-        this.occurredAt = Instant.now();
-    }
-
 }

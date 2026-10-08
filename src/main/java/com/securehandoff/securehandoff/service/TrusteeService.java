@@ -1,69 +1,70 @@
 package com.securehandoff.securehandoff.service;
 
-import org.apache.kafka.common.errors.ApiException;
-import org.springframework.http.HttpStatus;
-
-import com.securehandoff.securehandoff.model.TrusteeLink;
-import com.securehandoff.securehandoff.repository.TrusteeLinkRepository;
-import com.securehandoff.securehandoff.repository.UserRepository;
-import com.securehandoff.exception.ApiException;
-import com.securehandoff.model.Role;
-import com.securehandoff.model.TrusteeLink;
-import com.securehandoff.model.User;
-import com.securehandoff.repository.TrusteeLinkRepository;
-import com.securehandoff.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.securehandoff.securehandoff.exception.ApiException;
+import com.securehandoff.securehandoff.model.Role;
+import com.securehandoff.securehandoff.model.TrusteeLink;
+import com.securehandoff.securehandoff.model.User;
+import com.securehandoff.securehandoff.repository.TrusteeLinkRepository;
+import com.securehandoff.securehandoff.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class TrusteeService {
 
-     private final TrusteeLinkRepository trusteeLinkRepository;
+    private static final Duration INVITE_TTL = Duration.ofDays(7);
+
+    private final TrusteeLinkRepository trusteeLinkRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
-    /**
-     * Owner invites someone (by email) to be a trustee. The invite is a signed, unguessable
-     * token — in Phase 4 this gets emailed out via the notification service.
-     */
+    @Transactional
     public TrusteeLink inviteTrustee(User owner, String trusteeEmail) {
-        String normalizedEmail = trusteeEmail.toLowerCase().trim();
+        String email = trusteeEmail.toLowerCase().trim();
 
-        if (normalizedEmail.equals(owner.getEmail())) {
+        if (email.equals(owner.getEmail())) {
             throw new ApiException("You can't designate yourself as your own trustee", HttpStatus.BAD_REQUEST);
         }
 
-        boolean duplicate = trusteeLinkRepository.findByOwner(owner).stream().anyMatch(l ->
-                l.getTrusteeEmail().equalsIgnoreCase(normalizedEmail)
-                        && (l.getStatus() == TrusteeLink.TrusteeStatus.PENDING || l.getStatus() == TrusteeLink.TrusteeStatus.ACCEPTED));
-        if (duplicate) {
+        boolean alreadyActive = trusteeLinkRepository.findByOwner(owner).stream().anyMatch(link ->
+                link.getTrusteeEmail().equalsIgnoreCase(email)
+                        && (link.getStatus() == TrusteeLink.TrusteeStatus.PENDING
+                            || link.getStatus() == TrusteeLink.TrusteeStatus.ACCEPTED));
+        if (alreadyActive) {
             throw new ApiException("This person is already invited or an accepted trustee", HttpStatus.CONFLICT);
         }
 
         TrusteeLink link = TrusteeLink.builder()
                 .owner(owner)
-                .trusteeEmail(normalizedEmail)
+                .trusteeEmail(email)
                 .status(TrusteeLink.TrusteeStatus.PENDING)
                 .inviteToken(UUID.randomUUID().toString())
+                .inviteExpiresAt(Instant.now().plus(INVITE_TTL))
                 .build();
 
         TrusteeLink saved = trusteeLinkRepository.save(link);
-        notificationService.sendInviteEmail(normalizedEmail, owner.getFullName(), saved.getInviteToken());
+        notificationService.sendInviteEmail(email, owner.getFullName(), saved.getInviteToken());
         return saved;
     }
 
-    /**
-     * The invited person accepts using the token from their invite email/link. They must
-     * already have (or now create) a SecureHandoff account matching the invited email.
-     */
+    @Transactional
     public TrusteeLink acceptInvite(String inviteToken, User acceptingUser) {
         TrusteeLink link = trusteeLinkRepository.findByInviteToken(inviteToken)
                 .orElseThrow(() -> new ApiException("Invalid or expired invite", HttpStatus.NOT_FOUND));
+
+        if (link.getInviteExpiresAt() != null && Instant.now().isAfter(link.getInviteExpiresAt())) {
+            throw new ApiException("Invalid or expired invite", HttpStatus.NOT_FOUND);
+        }
 
         if (!link.getTrusteeEmail().equalsIgnoreCase(acceptingUser.getEmail())) {
             throw new ApiException("This invite was sent to a different email address", HttpStatus.FORBIDDEN);
@@ -75,10 +76,9 @@ public class TrusteeService {
 
         link.setTrusteeUser(acceptingUser);
         link.setStatus(TrusteeLink.TrusteeStatus.ACCEPTED);
-        link.setRespondedAt(java.time.Instant.now());
+        link.setRespondedAt(Instant.now());
         trusteeLinkRepository.save(link);
 
-        // Grant the TRUSTEE role so their JWT reflects the new capability on next login.
         if (!acceptingUser.getRoles().contains(Role.TRUSTEE)) {
             acceptingUser.getRoles().add(Role.TRUSTEE);
             userRepository.save(acceptingUser);
@@ -87,14 +87,17 @@ public class TrusteeService {
         return link;
     }
 
+    @Transactional(readOnly = true)
     public List<TrusteeLink> listMyTrustees(User owner) {
         return trusteeLinkRepository.findByOwner(owner);
     }
 
+    @Transactional(readOnly = true)
     public List<TrusteeLink> listWhereIAmTrustee(User trustee) {
         return trusteeLinkRepository.findByTrusteeUser(trustee);
     }
 
+    @Transactional
     public void revokeTrustee(User owner, Long linkId) {
         TrusteeLink link = trusteeLinkRepository.findById(linkId)
                 .orElseThrow(() -> new ApiException("Trustee link not found", HttpStatus.NOT_FOUND));

@@ -1,8 +1,7 @@
 package com.securehandoff.securehandoff.model;
 
-public class Role {
+public enum Role {
     OWNER,
     TRUSTEE,
     ADMIN
-
 }

@@ -1,31 +1,37 @@
 package com.securehandoff.securehandoff.service;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
-
-import com.securehandoff.securehandoff.model.AuditLog;
-
-
-import com.securehandoff.model.AuditLog;
-import com.securehandoff.model.User;
-import com.securehandoff.repository.AuditLogRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.securehandoff.securehandoff.model.AuditLog;
+import com.securehandoff.securehandoff.model.User;
+import com.securehandoff.securehandoff.repository.AuditLogRepository;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * Tamper-evident audit trail: each entry stores the hash of the previous entry,
+ * so editing or deleting history breaks the chain and is detectable.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuditService {
-     private static final String GENESIS_HASH = "0".repeat(64);
+
+    private static final String GENESIS_HASH = "0".repeat(64);
 
     private final AuditLogRepository auditLogRepository;
 
+    @Transactional
     public void log(User actor, String eventType, String description) {
-        String previousHash = auditLogRepository.findTopByOrderByIdDesc()
+        // PESSIMISTIC_WRITE on the newest row: concurrent writers queue up, so the chain cannot fork.
+        String previousHash = auditLogRepository.findFirstByOrderByIdDesc()
                 .map(AuditLog::getHash)
                 .orElse(GENESIS_HASH);
 
@@ -33,33 +39,30 @@ public class AuditService {
                 .actor(actor)
                 .eventType(eventType)
                 .description(description)
+                // MySQL stores microseconds; truncating here keeps the hashed value identical to the stored one.
+                .occurredAt(Instant.now().truncatedTo(ChronoUnit.MICROS))
                 .previousHash(previousHash)
-                .hash("PENDING")
+                .hash("")
                 .build();
 
-        // occurredAt is only populated by @PrePersist on first save, and the hash needs to
-        // cover it — so we save once, then compute the real hash and persist it. This row
-        // is never modified again after this method returns; that's what keeps it append-only.
-        entry = auditLogRepository.save(entry);
         entry.setHash(computeHash(previousHash, entry));
-        auditLogRepository.save(entry);
+        auditLogRepository.save(entry); // single INSERT, never updated afterwards
     }
 
+    @Transactional(readOnly = true)
     public List<AuditLog> history(User actor) {
         return auditLogRepository.findByActorOrderByOccurredAtDesc(actor);
     }
 
-    /** Walks the full chain and verifies no historical entry has been altered. */
+    /** Walks the whole chain and returns false if any entry was altered or removed. */
+    @Transactional(readOnly = true)
     public boolean verifyChainIntegrity() {
-        List<AuditLog> all = auditLogRepository.findAllByOrderByIdAsc();
         String expectedPrevious = GENESIS_HASH;
-
-        for (AuditLog entry : all) {
+        for (AuditLog entry : auditLogRepository.findAllByOrderByIdAsc()) {
             if (!entry.getPreviousHash().equals(expectedPrevious)) {
                 return false;
             }
-            String recomputed = computeHash(entry.getPreviousHash(), entry);
-            if (!recomputed.equals(entry.getHash())) {
+            if (!computeHash(entry.getPreviousHash(), entry).equals(entry.getHash())) {
                 return false;
             }
             expectedPrevious = entry.getHash();
@@ -69,14 +72,12 @@ public class AuditService {
 
     private String computeHash(String previousHash, AuditLog entry) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             String content = previousHash + "|" + entry.getActor().getId() + "|" + entry.getEventType()
                     + "|" + entry.getDescription() + "|" + entry.getOccurredAt();
-            byte[] hashBytes = digest.digest(content.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashBytes);
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
         } catch (Exception e) {
-            throw new IllegalStateException("SHA-256 should always be available on the JVM", e);
+            throw new IllegalStateException("SHA-256 unavailable", e);
         }
     }
-
 }

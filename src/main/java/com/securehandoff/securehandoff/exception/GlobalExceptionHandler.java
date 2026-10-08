@@ -2,28 +2,26 @@ package com.securehandoff.securehandoff.exception;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import lombok.extern.slf4j.Slf4j;
-
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import com.securehandoff.securehandoff.exception.*;
-
-import java.util.Map;
-
-import org.apache.kafka.common.errors.ApiException;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-      @ExceptionHandler(ApiException.class)
+
+    @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String, Object>> handleApiException(ApiException ex) {
         return ResponseEntity.status(ex.getStatus()).body(body(ex.getStatus().value(), ex.getMessage()));
     }
@@ -39,13 +37,30 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleUnreadable(HttpMessageNotReadableException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body(400, "Malformed JSON or invalid field value (check enum values like category)"));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(body(400, "Malformed JSON or invalid field value (check enum values like category)"));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(DataIntegrityViolationException ex) {
         log.warn("Data integrity violation", ex);
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(body(409, "That action conflicts with existing data (duplicate?)"));
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(body(409, "That action conflicts with existing data (duplicate?)"));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body(403, "Access denied"));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body(404, "Not found"));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body(405, "Method not allowed"));
     }
 
     @ExceptionHandler(Exception.class)
@@ -62,5 +77,4 @@ public class GlobalExceptionHandler {
         map.put("message", message);
         return map;
     }
-
 }

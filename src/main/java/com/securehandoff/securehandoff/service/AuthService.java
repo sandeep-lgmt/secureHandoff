@@ -1,32 +1,32 @@
 package com.securehandoff.securehandoff.service;
 
 import java.util.HashSet;
+import java.util.Set;
 
-import org.apache.kafka.common.errors.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import com.securehandoff.securehandoff.repository.UserRepository;
-import com.securehandoff.dto.AuthResponse;
-import com.securehandoff.dto.LoginRequest;
-import com.securehandoff.dto.RegisterRequest;
-import com.securehandoff.exception.ApiException;
-import com.securehandoff.model.Role;
-import com.securehandoff.model.User;
-import com.securehandoff.repository.UserRepository;
-import com.securehandoff.security.JwtUtil;
-import com.securehandoff.security.LoginRateLimiter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.Set;
+
+import com.securehandoff.securehandoff.dto.AuthResponse;
+import com.securehandoff.securehandoff.dto.LoginRequest;
+import com.securehandoff.securehandoff.dto.RegisterRequest;
+import com.securehandoff.securehandoff.exception.ApiException;
+import com.securehandoff.securehandoff.model.Role;
+import com.securehandoff.securehandoff.model.User;
+import com.securehandoff.securehandoff.repository.UserRepository;
+import com.securehandoff.securehandoff.security.JwtUtil;
+import com.securehandoff.securehandoff.security.LoginRateLimiter;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-
 public class AuthService {
-      private final UserRepository userRepository;
+
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
@@ -34,6 +34,7 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         String email = request.email().toLowerCase().trim();
+
         if (userRepository.existsByEmail(email)) {
             throw new ApiException("An account with this email already exists", HttpStatus.CONFLICT);
         }
@@ -45,7 +46,7 @@ public class AuthService {
                 .roles(new HashSet<>(Set.of(Role.OWNER)))
                 .build();
 
-        userRepository.save(user);
+        user = userRepository.save(user);
 
         String token = jwtUtil.generateAccessToken(user);
         return AuthResponse.of(token, user.getEmail(), user.getFullName());
@@ -57,9 +58,9 @@ public class AuthService {
 
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, request.password())
-            );
-        } catch (Exception ex) {
+                    new UsernamePasswordAuthenticationToken(email, request.password()));
+        } catch (AuthenticationException ex) {
+            // Only genuine authentication failures count; infrastructure errors do not.
             loginRateLimiter.recordFailedAttempt(email);
             throw new ApiException("Invalid email or password", HttpStatus.UNAUTHORIZED);
         }
@@ -72,5 +73,4 @@ public class AuthService {
         String token = jwtUtil.generateAccessToken(user);
         return AuthResponse.of(token, user.getEmail(), user.getFullName());
     }
-
 }

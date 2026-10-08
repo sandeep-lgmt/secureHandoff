@@ -1,27 +1,33 @@
-package com.securehandoff.securehandoff.Security;
+package com.securehandoff.securehandoff.security;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.function.Function;
 
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
+@Component
 public class JwtUtil {
-     private final SecretKey signingKey;
+
+    private final SecretKey signingKey;
     private final long accessTokenExpiryMs;
 
     public JwtUtil(
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.access-token-expiry-ms}") long accessTokenExpiryMs
     ) {
-        this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("app.jwt.secret must be at least 32 bytes long");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
         this.accessTokenExpiryMs = accessTokenExpiryMs;
     }
 
@@ -39,25 +45,21 @@ public class JwtUtil {
     }
 
     public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
+        return parse(token).getSubject();
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        Claims claims = parse(token); // signature is verified and the token parsed once
+        return claims.getSubject().equals(userDetails.getUsername())
+                && claims.getExpiration().after(new Date())
+                && userDetails.isEnabled();
     }
 
-    private boolean isTokenExpired(String token) {
-        return extractClaim(token, Claims::getExpiration).before(new Date());
-    }
-
-    private <T> T extractClaim(String token, Function<Claims, T> resolver) {
-        Claims claims = Jwts.parser()
+    private Claims parse(String token) {
+        return Jwts.parser()
                 .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return resolver.apply(claims);
     }
-
 }
