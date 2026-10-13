@@ -6,13 +6,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.context.ApplicationEventPublisher;
+import com.securehandoff.securehandoff.model.CheckInConfig;
+import com.securehandoff.securehandoff.repository.CheckInConfigRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.securehandoff.securehandoff.dto.ReleaseRequestResponse;
-import com.securehandoff.securehandoff.event.ReleaseEvent;
 import com.securehandoff.securehandoff.exception.ApiException;
 import com.securehandoff.securehandoff.model.AccessPacket;
 import com.securehandoff.securehandoff.model.ReleaseConfirmation;
@@ -36,7 +36,7 @@ public class ConsensusService {
     private final AccessPacketRepository packetRepository;
     private final PacketService packetService;
     private final AuditService auditService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final CheckInConfigRepository checkInConfigRepository;
 
     /** Release requests currently waiting on this trustee. */
     @Transactional(readOnly = true)
@@ -90,8 +90,12 @@ public class ConsensusService {
                     "Release request #" + request.getId() + " reached quorum ("
                             + totalConfirmations + "/" + request.getRequiredConfirmations() + ")");
 
-            // Forwarded to Kafka only after this transaction commits (see KafkaEventRelay).
-            eventPublisher.publishEvent(new ReleaseEvent(request.getOwner().getId(), request.getId(), Instant.now()));
+               checkInConfigRepository.findByOwner(request.getOwner()).ifPresent(config -> {
+       config.setStatus(CheckInConfig.CheckInStatus.RELEASED);
+       checkInConfigRepository.save(config);
+   });  
+   auditService.log(request.getOwner(), "PACKETS_RELEASED",
+           "Release request #" + request.getId() + " completed");
         }
 
         return ReleaseRequestResponse.from(request);

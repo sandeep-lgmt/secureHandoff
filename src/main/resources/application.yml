@@ -3,13 +3,13 @@ spring:
     name: securehandoff
 
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:3306/securehandoff?createDatabaseIfNotExist=true
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update          # dev convenience; use Flyway/Liquibase + "validate" in production
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
@@ -19,10 +19,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-
-  kafka:
-    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
-    # Producer/consumer serialization is configured explicitly in KafkaConfig.java
+      password: ${REDIS_PASSWORD:}
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
@@ -32,17 +29,18 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 app:
   jwt:
-    secret: ${JWT_SECRET}                  # required, at least 32 characters
-    access-token-expiry-ms: 3600000        # 1 hour
+    secret: ${JWT_SECRET}
+    access-token-expiry-ms: 3600000
   encryption:
-    # Base64 of exactly 32 random bytes:  openssl rand -base64 32   (required)
-    # In production pull this from a KMS / secrets manager.
     packet-secret: ${PACKET_SECRET}
 
 management:
@@ -50,3 +48,6 @@ management:
     web:
       exposure:
         include: health
+  health:
+    mail:
+      enabled: false

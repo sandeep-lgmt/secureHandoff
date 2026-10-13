@@ -10,8 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.securehandoff.securehandoff.event.EscalationnEvent;
 import com.securehandoff.securehandoff.exception.ApiException;
 import com.securehandoff.securehandoff.model.CheckInConfig;
 import com.securehandoff.securehandoff.model.ReleaseRequest;
@@ -21,7 +19,6 @@ import com.securehandoff.securehandoff.repository.ReleaseRequestRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,7 +29,7 @@ public class CheckInService {
     private final CheckInConfigRepository checkInConfigRepository;
     private final ReleaseRequestRepository releaseRequestRepository;
     private final StringRedisTemplate redisTemplate;
-    private final ApplicationEventPublisher eventPublisher;
+    private final EscalationService escalationService;
     private final AuditService auditService;
 
     @Transactional
@@ -115,7 +112,7 @@ public class CheckInService {
                 User owner = config.getOwner();
                 log.warn("Owner {} missed their check-in deadline. Publishing escalation event.", owner.getEmail());
 
-                eventPublisher.publishEvent(new EscalationEvent(owner.getId(), owner.getEmail(), now));
+                escalationService.escalate(owner);
                 auditService.log(owner, "CHECKIN_OVERDUE", "Missed check-in deadline; escalation triggered");
             }
         }
