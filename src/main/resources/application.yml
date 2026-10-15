@@ -37,6 +37,9 @@ server:
   port: ${PORT:8080}
 
 app:
+  mail:
+    api-key: ${BREVO_API_KEY:}
+    from: ${MAIL_FROM:}
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiry-ms: 3600000
